@@ -3,6 +3,7 @@ import type { FormSchema, FormStatus } from "@/types";
 import {
   ensureMetaSchema,
   getDataName,
+  getDbConfig,
   getMetaName,
   withConnection,
 } from "@/lib/mysql";
@@ -174,36 +175,42 @@ export interface PublishResult {
   created: boolean;
 }
 
+export async function ensureDataTable(form: FormSchema): Promise<{ table: string; columns: { name: string; type: string }[] }> {
+  const data = await getDataName();
+  const table = sanitizeIdentifierSafe(form.table);
+  if (!table) throw new DbError("نام جدول پاسخ‌ها نامعتبر است");
+  const resolved = resolveColumns(form);
+  await withConnection(async (conn) => {
+    await conn.query(`CREATE DATABASE IF NOT EXISTS \`${data}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+    const colDefs = [
+      "`id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY",
+      ...resolved.map((c) => `\`${c.name}\` ${c.sqlType} NULL`),
+      "`submitted_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      "`ip` VARCHAR(64) NULL",
+    ].join(", ");
+    await conn.query(
+      `CREATE TABLE IF NOT EXISTS \`${data}\`.\`${table}\` (${colDefs}) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+    );
+  });
+  return { table, columns: resolved.map((c) => ({ name: c.name, type: c.sqlType })) };
+}
+
 export async function publishForm(form: FormSchema): Promise<PublishResult> {
   try {
-    const data = await getDataName();
-    const resolved = resolveColumns(form);
-    const created = await withConnection(async (conn) => {
-      await conn.query(`CREATE DATABASE IF NOT EXISTS \`${data}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
-      const colDefs = [
-        "`id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY",
-        ...resolved.map((c) => `\`${c.name}\` ${c.sqlType} NULL`),
-        "`submitted_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
-        "`ip` VARCHAR(64) NULL",
-      ].join(", ");
-      const [result] = await conn.query(
-        `CREATE TABLE IF NOT EXISTS \`${data}\`.\`${form.table}\` (${colDefs}) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
-      );
-      return result;
-    });
+    const ensured = await ensureDataTable(form);
 
     const meta = await getMetaName();
     await withConnection(async (conn) => {
       await conn.query(
         `UPDATE \`${meta}\`.\`forms\` SET status = 'published', published_at = IFNULL(published_at, NOW()), \`table\` = ? WHERE id = ?`,
-        [form.table, form.id]
+        [ensured.table, form.id]
       );
     });
 
     return {
-      table: form.table,
-      columns: resolved.map((c) => ({ name: c.name, type: c.sqlType })),
-      created: !!created,
+      table: ensured.table,
+      columns: ensured.columns,
+      created: true,
     };
   } catch (e) {
     mapError(e);
@@ -301,4 +308,60 @@ export async function insertSubmission(
   } catch (e) {
     mapError(e);
   }
+}
+
+export async function tableExists(tableName: string): Promise<boolean> {
+  try {
+    const data = await getDataName();
+    const safe = sanitizeIdentifierSafe(tableName);
+    if (!safe) return false;
+    const rows = await withConnection(async (conn) => {
+      const [r] = await conn.query<RowDataPacket[]>(
+        `SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?`,
+        [data, safe]
+      );
+      return r;
+    });
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+export interface DbInfo {
+  user: string;
+  currentUser: string;
+  host: string;
+  port: number;
+  databases: string[];
+  dataDb: string;
+  dataTables: string[];
+}
+
+export async function getDbInfo(): Promise<DbInfo> {
+  const cfg = await getDbConfig();
+  const data = await getDataName();
+  return await withConnection(async (conn) => {
+    const [u] = await conn.query<RowDataPacket[]>(`SELECT USER() AS u, CURRENT_USER() AS cu`);
+    const [dbs] = await conn.query<RowDataPacket[]>(`SHOW DATABASES`);
+    let dataTables: string[] = [];
+    try {
+      const [tbls] = await conn.query<RowDataPacket[]>(
+        `SELECT TABLE_NAME AS t FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? ORDER BY TABLE_NAME`,
+        [data]
+      );
+      dataTables = tbls.map((r) => String(r.t));
+    } catch {
+      dataTables = [];
+    }
+    return {
+      user: String(u[0]?.u || ""),
+      currentUser: String(u[0]?.cu || ""),
+      host: cfg.host,
+      port: cfg.port,
+      databases: dbs.map((r) => String(Object.values(r)[0])),
+      dataDb: data,
+      dataTables,
+    };
+  });
 }

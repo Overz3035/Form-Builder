@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { FieldConfig } from "@/types";
-import { DbError, getFormBySlug, insertSubmission } from "@/lib/db";
+import { DbError, ensureDataTable, getFormBySlug, insertSubmission } from "@/lib/db";
 import { resolveColumns } from "@/lib/generator/columns";
 
 export const dynamic = "force-dynamic";
@@ -106,6 +106,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
     }
 
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
+    await ensureDataTable(form);
     await insertSubmission(form.table, resolved.map((c) => c.name), values, ip);
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (e) {

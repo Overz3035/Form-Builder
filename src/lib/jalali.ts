@@ -15,6 +15,31 @@ const JALALI_MONTHS = [
 
 const WEEKDAYS = ["ش", "ی", "د", "س", "چ", "پ", "ج"];
 
+const GREG_MONTHS_FA = [
+  "ژانویه",
+  "فوریه",
+  "مارس",
+  "آوریل",
+  "مه",
+  "ژوئن",
+  "ژوئیه",
+  "اوت",
+  "سپتامبر",
+  "اکتبر",
+  "نوامبر",
+  "دسامبر",
+];
+
+export function gregorianMonthLength(gy: number, gm: number): number {
+  return new Date(gy, gm, 0).getDate();
+}
+
+export function formatGregorianDate(iso: string): string {
+  const g = parseIsoDate(iso);
+  if (!g) return iso;
+  return `${g.gy}/${String(g.gm).padStart(2, "0")}/${String(g.gd).padStart(2, "0")}`;
+}
+
 function div(a: number, b: number): number {
   return Math.trunc(a / b);
 }
@@ -110,7 +135,7 @@ export function jalaliMonthLength(jy: number, jm: number): number {
   return jalCal(jy).leap === 0 ? 30 : 29;
 }
 
-export { JALALI_MONTHS, WEEKDAYS };
+export { JALALI_MONTHS, WEEKDAYS, GREG_MONTHS_FA };
 
 export function parseIsoDate(iso: string): { gy: number; gm: number; gd: number } | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);

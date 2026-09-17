@@ -182,6 +182,36 @@ function insert_row(array $data, string $ip): bool {
     }
 }
 
+function safe_ident(string $name): ?string {
+    return preg_match('/^[A-Za-z0-9_]{1,60}$/', $name) ? $name : null;
+}
+
+function ensure_table(array $columns): bool {
+    try {
+        $table = safe_ident(TABLE);
+        if ($table === null) return false;
+        $pdo = new PDO(
+            'mysql:host=' . DB_HOST . ';port=' . DB_PORT . ';charset=utf8mb4',
+            DB_USER, DB_PASS,
+            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+        );
+        $pdo->exec('CREATE DATABASE IF NOT EXISTS \`' . DB_NAME . '\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+        $defs = ['\`id\` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY'];
+        foreach ($columns as $name => $c) {
+            $col = safe_ident($name);
+            if ($col === null) continue;
+            $defs[] = '\`' . $col . '\` ' . $c['sql'] . ' NULL';
+        }
+        $defs[] = '\`submitted_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP';
+        $defs[] = '\`ip\` VARCHAR(64) NULL';
+        $pdo->exec('CREATE TABLE IF NOT EXISTS \`' . DB_NAME . '\`.\`' . $table . '\` (' . implode(', ', $defs) . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+        return true;
+    } catch (Throwable $ex) {
+        error_log('ViraForms ensure_table error: ' . $ex->getMessage());
+        return false;
+    }
+}
+
 function save_upload(array $file, string $prefix): ?string {
     if (empty($file) || !isset($file['tmp_name']) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) return null;
     if ($file['size'] > 10 * 1024 * 1024) return null;
@@ -259,7 +289,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         }
         if (empty($errors)) {
             $ip = $_SERVER['REMOTE_ADDR'] ?? null;
-            if (insert_row($row, $ip)) {
+            if (!ensure_table($COLUMNS)) {
+                $serverError = true;
+                $serverErrorMsg = 'خطا در آماده‌سازی جدول دیتابیس. لطفاً با مدیر فرم تماس بگیرید.';
+            } elseif (insert_row($row, $ip)) {
                 $success = true;
                 if (SMS_ENABLED) {
                     $phoneCol = null;
@@ -361,6 +394,9 @@ $isDark = ${dark ? "true" : "false"};
   .jalcal .day.today { box-shadow: inset 0 0 0 1px var(--primary); color: var(--primary); }
   .jalcal .todaybtn { width: 100%; margin-top: 8px; background: none; border: none; color: var(--primary); font-family: inherit; font-size: 12px; cursor: pointer; padding: 7px; border-radius: 9px; }
   .jalcal .todaybtn:hover { background: rgba(139,92,246,.1); }
+  .jalcal .caltabs { display: flex; gap: 4px; background: ${dark ? "rgba(255,255,255,.05)" : "rgba(24,24,27,.05)"}; border-radius: 10px; padding: 3px; margin-bottom: 8px; }
+  .jalcal .caltabs button { flex: 1; border: none; background: none; color: var(--muted); font-family: inherit; font-size: 12px; font-weight: 600; padding: 6px; border-radius: 8px; cursor: pointer; }
+  .jalcal .caltabs button.on { background: rgba(139,92,246,.15); color: var(--primary); }
   .opt { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 12px; margin-top: 8px; cursor: pointer; font-size: 14px; transition: all .2s; }
   .opt:hover { border-color: var(--primary); }
   .err { color: var(--error); font-size: 12px; margin-top: 5px; display: none; }
@@ -628,7 +664,7 @@ const SERVER_ERRORS = <?= json_encode($errors, JSON_UNESCAPED_UNICODE | JSON_HEX
     return { jy: jy, jm: 7 + jdiv(k, 30), jd: jmod(k, 30) + 1 };
   }
   function isoToJal(iso) {
-    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+    var m = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(iso || '');
     if (!m) return null;
     return d2j(g2d(+m[1], +m[2], +m[3]));
   }
@@ -643,6 +679,18 @@ const SERVER_ERRORS = <?= json_encode($errors, JSON_UNESCAPED_UNICODE | JSON_HEX
     return p.jy + '/' + (p.jm < 10 ? '0' : '') + p.jm + '/' + (p.jd < 10 ? '0' : '') + p.jd;
   }
   function monthLen(jy, jm) { return jm <= 6 ? 31 : (jm <= 11 ? 30 : (jalCal(jy).leap === 0 ? 30 : 29)); }
+  var GREG_MONTHS = ['ژانویه','فوریه','مارس','آوریل','مه','ژوئن','ژوئیه','اوت','سپتامبر','اکتبر','نوامبر','دسامبر'];
+  function gregLen(gy, gm) { return new Date(gy, gm, 0).getDate(); }
+  function parseIso(iso) {
+    var m = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(iso || '');
+    return m ? { y: +m[1], m: +m[2], d: +m[3] } : null;
+  }
+  function gregDisplay(iso) {
+    var p = parseIso(iso);
+    if (!p) return iso;
+    return p.y + '/' + (p.m < 10 ? '0' : '') + p.m + '/' + (p.d < 10 ? '0' : '') + p.d;
+  }
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
 
   function attachJalali(f, wrap) {
     var txt = wrap.querySelector('#fld-' + f.id);
@@ -650,55 +698,102 @@ const SERVER_ERRORS = <?= json_encode($errors, JSON_UNESCAPED_UNICODE | JSON_HEX
     var box = wrap.querySelector('#cal-' + f.id);
     if (!txt || !hidden || !box) return;
     var view = null;
-    var todayJ = d2j(g2d(new Date().getFullYear(), new Date().getMonth() + 1, new Date().getDate()));
+    var pcal = 'j';
+    var nowD = new Date();
+    var todayJ = d2j(g2d(nowD.getFullYear(), nowD.getMonth() + 1, nowD.getDate()));
+
+    function syncView() {
+      var iso = hidden.value;
+      if (pcal === 'j') {
+        var sel = isoToJal(iso);
+        view = sel ? { y: sel.jy, m: sel.jm } : { y: todayJ.jy, m: todayJ.jm };
+      } else {
+        var g = parseIso(iso);
+        view = g ? { y: g.y, m: g.m } : { y: nowD.getFullYear(), m: nowD.getMonth() + 1 };
+      }
+    }
+
+    function dayIso(d) {
+      if (pcal === 'j') return jalToIso(view.y, view.m, d);
+      return view.y + '-' + pad2(view.m) + '-' + pad2(d);
+    }
 
     function draw() {
-      var sel = isoToJal(hidden.value);
-      if (!view) {
-        view = sel ? { jy: sel.jy, jm: sel.jm } : { jy: todayJ.jy, jm: todayJ.jm };
+      var iso = hidden.value;
+      var len, leading, title;
+      if (pcal === 'j') {
+        len = monthLen(view.y, view.m);
+        var firstG = d2g(j2d(view.y, view.m, 1));
+        leading = (new Date(firstG.gy, firstG.gm - 1, firstG.gd).getDay() + 1) % 7;
+        title = JAL_MONTHS[view.m - 1] + ' ' + view.y;
+      } else {
+        len = gregLen(view.y, view.m);
+        leading = (new Date(view.y, view.m - 1, 1).getDay() + 1) % 7;
+        title = GREG_MONTHS[view.m - 1] + ' ' + view.y;
       }
-      var len = monthLen(view.jy, view.jm);
-      var firstG = d2g(j2d(view.jy, view.jm, 1));
-      var leading = (new Date(firstG.gy, firstG.gm - 1, firstG.gd).getDay() + 1) % 7;
-      var html = '<div class="head"><button type="button" data-nav="-1" aria-label="ماه قبل">&rsaquo;</button><span class="title">' + JAL_MONTHS[view.jm - 1] + ' ' + view.jy + '</span><button type="button" data-nav="1" aria-label="ماه بعد">&lsaquo;</button></div><div class="grid">';
+      var html = '<div class="caltabs"><button type="button" data-cal="j" class="' + (pcal === 'j' ? 'on' : '') + '">شمسی</button><button type="button" data-cal="g" class="' + (pcal === 'g' ? 'on' : '') + '">میلادی</button></div>';
+      html += '<div class="head"><button type="button" data-nav="-1" aria-label="ماه قبل">&rsaquo;</button><span class="title">' + title + '</span><button type="button" data-nav="1" aria-label="ماه بعد">&lsaquo;</button></div><div class="grid">';
       ['ش','ی','د','س','چ','پ','ج'].forEach(function (w) { html += '<span class="dow">' + w + '</span>'; });
       for (var e = 0; e < leading; e++) html += '<span></span>';
       for (var d = 1; d <= len; d++) {
         var cls = 'day';
-        if (sel && sel.jy === view.jy && sel.jm === view.jm && sel.jd === d) cls += ' sel';
-        if (todayJ.jy === view.jy && todayJ.jm === view.jm && todayJ.jd === d) cls += ' today';
+        if (iso && dayIso(d) === iso) cls += ' sel';
+        var tIso = pcal === 'j'
+          ? jalToIso(todayJ.jy, todayJ.jm, todayJ.jd)
+          : nowD.getFullYear() + '-' + pad2(nowD.getMonth() + 1) + '-' + pad2(nowD.getDate());
+        if (dayIso(d) === tIso) cls += ' today';
         html += '<button type="button" class="' + cls + '" data-day="' + d + '">' + d + '</button>';
       }
       html += '</div><button type="button" class="todaybtn" data-today="1">امروز</button>';
       box.innerHTML = html;
+      box.querySelectorAll('[data-cal]').forEach(function (b) {
+        b.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var next = b.getAttribute('data-cal');
+          if (next === pcal) return;
+          if (next === 'g') {
+            var g = d2g(j2d(view.y, view.m, 1));
+            view = { y: g.gy, m: g.gm };
+          } else {
+            var j = d2j(g2d(view.y, view.m, 1));
+            view = { y: j.jy, m: j.jm };
+          }
+          pcal = next;
+          draw();
+        });
+      });
       box.querySelectorAll('[data-nav]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          var jm = view.jm + parseInt(b.getAttribute('data-nav'), 10);
-          var jy = view.jy;
-          if (jm > 12) { jm = 1; jy++; }
-          if (jm < 1) { jm = 12; jy--; }
-          view = { jy: jy, jm: jm };
+        b.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var m = view.m + parseInt(b.getAttribute('data-nav'), 10);
+          var y = view.y;
+          if (m > 12) { m = 1; y++; }
+          if (m < 1) { m = 12; y--; }
+          view = { y: y, m: m };
           draw();
         });
       });
       box.querySelectorAll('[data-day]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          var iso = jalToIso(view.jy, view.jm, parseInt(b.getAttribute('data-day'), 10));
-          hidden.value = iso;
-          txt.value = jalDisplay(iso);
-          values[f.id] = iso;
+        b.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var v = dayIso(parseInt(b.getAttribute('data-day'), 10));
+          hidden.value = v;
+          txt.value = pcal === 'j' ? jalDisplay(v) : gregDisplay(v);
+          values[f.id] = v;
           box.classList.remove('open');
           var err = document.getElementById('err-' + f.id);
           if (err) err.classList.remove('show');
         });
       });
       var tb = box.querySelector('[data-today]');
-      if (tb) tb.addEventListener('click', function () {
-        var iso = jalToIso(todayJ.jy, todayJ.jm, todayJ.jd);
-        hidden.value = iso;
-        txt.value = jalDisplay(iso);
-        values[f.id] = iso;
-        view = { jy: todayJ.jy, jm: todayJ.jm };
+      if (tb) tb.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var v = nowD.getFullYear() + '-' + pad2(nowD.getMonth() + 1) + '-' + pad2(nowD.getDate());
+        hidden.value = v;
+        txt.value = pcal === 'j' ? jalDisplay(v) : gregDisplay(v);
+        values[f.id] = v;
+        if (pcal === 'j') view = { y: todayJ.jy, m: todayJ.jm };
+        else view = { y: nowD.getFullYear(), m: nowD.getMonth() + 1 };
         box.classList.remove('open');
       });
     }
@@ -707,7 +802,7 @@ const SERVER_ERRORS = <?= json_encode($errors, JSON_UNESCAPED_UNICODE | JSON_HEX
       if (f.disabled) return;
       var wasOpen = box.classList.contains('open');
       document.querySelectorAll('.jalcal.open').forEach(function (c) { c.classList.remove('open'); });
-      if (!wasOpen) { draw(); box.classList.add('open'); }
+      if (!wasOpen) { syncView(); draw(); box.classList.add('open'); }
     });
   }
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { DbError, deleteSubmission, getSubmissions } from "@/lib/db";
+import { DbError, deleteSubmission, getSubmissions, tableExists } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -9,8 +9,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     const { id } = await ctx.params;
     const table = req.nextUrl.searchParams.get("table");
     if (!table) return NextResponse.json({ error: "نام جدول مشخص نیست" }, { status: 400 });
-    const submissions = await getSubmissions(table);
-    return NextResponse.json({ submissions, formId: id });
+    const exists = await tableExists(table);
+    const submissions = exists ? await getSubmissions(table) : [];
+    return NextResponse.json({ submissions, formId: id, tableExists: exists });
   } catch (e) {
     const err = e as DbError;
     return NextResponse.json({ error: err.message, hint: err.hint }, { status: 503 });

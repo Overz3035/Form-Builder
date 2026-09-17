@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowRight, Download, Inbox, Loader2, RefreshCcw, Trash2 } from "lucide-react";
+import { ArrowRight, Database, Download, Inbox, Loader2, RefreshCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogBody, DialogFooter, DialogHeader } from "@/components/ui/dialog";
@@ -27,6 +27,16 @@ interface SubmissionRow {
   data: Record<string, string | number | null>;
 }
 
+interface DbInfoState {
+  user: string;
+  currentUser: string;
+  host: string;
+  port: number;
+  databases: string[];
+  dataDb: string;
+  dataTables: string[];
+}
+
 export default function SubmissionsPage() {
   const params = useParams();
   const router = useRouter();
@@ -37,6 +47,8 @@ export default function SubmissionsPage() {
   const [rows, setRows] = React.useState<SubmissionRow[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [tableExists, setTableExists] = React.useState<boolean | null>(null);
+  const [dbInfo, setDbInfo] = React.useState<DbInfoState | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<SubmissionRow | null>(null);
   const [deleting, setDeleting] = React.useState(false);
 
@@ -54,6 +66,7 @@ export default function SubmissionsPage() {
       const table = formData.form?.table;
       if (!table) {
         setRows([]);
+        setTableExists(false);
         setLoading(false);
         return;
       }
@@ -61,10 +74,18 @@ export default function SubmissionsPage() {
       const subData = await subRes.json();
       if (!subRes.ok) throw new Error(subData.error || "خطا در دریافت پاسخ‌ها");
       setRows(subData.submissions || []);
+      setTableExists(subData.tableExists !== false);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setLoading(false);
+    }
+    try {
+      const infoRes = await fetch(`/api/db/info`, { cache: "no-store" });
+      const infoData = await infoRes.json();
+      if (infoRes.ok && infoData.info) setDbInfo(infoData.info);
+    } catch {
+      /* connection info is best-effort */
     }
   }, [id]);
 
@@ -161,6 +182,33 @@ export default function SubmissionsPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+        {dbInfo && (
+          <details className="group mb-4 rounded-xl border border-border bg-white/[0.02] px-4 py-3">
+            <summary className="flex cursor-pointer list-none items-center gap-2 text-xs text-muted-foreground [&::-webkit-details-marker]:hidden">
+              <Database className="h-3.5 w-3.5 shrink-0 text-primary" />
+              <span>
+                متصل به <span dir="ltr" className="font-mono text-foreground">{dbInfo.host}:{dbInfo.port}</span>
+                {" "}با کاربر <span dir="ltr" className="font-mono text-foreground">{dbInfo.currentUser || dbInfo.user}</span>
+                {" "}— برای مقایسه با phpMyAdmin باز کنید
+              </span>
+              <span className="mr-auto text-[11px] transition-transform group-open:rotate-180">▾</span>
+            </summary>
+            <div className="mt-3 space-y-2 border-t border-border pt-3 text-xs leading-6 text-muted-foreground">
+              <p>
+                دیتابیس‌های قابل مشاهده برای این کاربر ({dbInfo.databases.length.toLocaleString("fa-IR")}):
+              </p>
+              <p dir="ltr" className="text-left font-mono text-[11px] text-foreground">
+                {dbInfo.databases.join(", ") || "—"}
+              </p>
+              <p>
+                جدول‌های دیتابیس <span dir="ltr" className="font-mono text-primary">{dbInfo.dataDb}</span> ({dbInfo.dataTables.length.toLocaleString("fa-IR")}):
+              </p>
+              <p dir="ltr" className="text-left font-mono text-[11px] text-foreground">
+                {dbInfo.dataTables.join(", ") || "—"}
+              </p>
+            </div>
+          </details>
+        )}
         {loading ? (
           <div className="flex items-center justify-center py-24">
             <Loader2 className="h-7 w-7 animate-spin text-primary" />
@@ -173,6 +221,19 @@ export default function SubmissionsPage() {
           <div className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-8 text-center">
             <p className="font-semibold text-foreground">این فرم هنوز منتشر نشده است</p>
             <p className="mt-2 text-sm text-muted-foreground">پس از انتشار، جدول پاسخ‌ها ساخته می‌شود.</p>
+          </div>
+        ) : tableExists === false ? (
+          <div className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-8 text-center">
+            <p className="font-semibold text-foreground">
+              جدول پاسخ‌ها در دیتابیس ساخته نشده است
+            </p>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-7 text-muted-foreground">
+              جدول <span dir="ltr" className="font-mono text-primary">Forms.{form.table}</span> وجود ندارد.
+              به بیلدر برگردید و فرم را <span className="font-semibold">منتشر</span> کنید تا جدول ساخته شود.
+            </p>
+            <Button variant="outline" size="sm" onClick={() => router.push(`/forms/${form.id}`)} className="mt-4 gap-1.5">
+              بازگشت به بیلدر
+            </Button>
           </div>
         ) : rows.length === 0 ? (
           <motion.div
