@@ -1,0 +1,264 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-background-subtle: var(--background-subtle);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-solid: var(--card-solid);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: 0.5rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
+  --font-sans: var(--font-vazir), "Vazirmatn", system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "Segoe UI Mono", monospace;
+}
+
+:root,
+.dark {
+  color-scheme: dark;
+
+  --background: #09090b;
+  --background-subtle: #0c0c0f;
+  --foreground: #fafafa;
+
+  --card: rgba(255, 255, 255, 0.04);
+  --card-solid: #111113;
+  --card-foreground: #fafafa;
+
+  --popover: #131316;
+  --popover-foreground: #fafafa;
+
+  --primary: #8b5cf6;
+  --primary-foreground: #ffffff;
+  --primary-glow: rgba(139, 92, 246, 0.35);
+
+  --secondary: rgba(255, 255, 255, 0.06);
+  --secondary-foreground: #e4e4e7;
+
+  --muted: rgba(255, 255, 255, 0.06);
+  --muted-foreground: #a1a1aa;
+
+  --accent: rgba(139, 92, 246, 0.12);
+  --accent-foreground: #c4b5fd;
+
+  --destructive: #f43f5e;
+  --destructive-foreground: #ffffff;
+  --success: #34d399;
+  --warning: #fbbf24;
+
+  --border: rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --input: rgba(255, 255, 255, 0.1);
+  --ring: #8b5cf6;
+
+  --cyan: #22d3ee;
+  --amber: #fbbf24;
+}
+
+.light {
+  color-scheme: light;
+
+  --background: #f7f7f9;
+  --background-subtle: #eeeef2;
+  --foreground: #18181b;
+
+  --card: #ffffff;
+  --card-solid: #ffffff;
+  --card-foreground: #18181b;
+
+  --popover: #ffffff;
+  --popover-foreground: #18181b;
+
+  --primary: #7c3aed;
+  --primary-foreground: #ffffff;
+  --primary-glow: rgba(124, 58, 237, 0.25);
+
+  --secondary: #f1f0f5;
+  --secondary-foreground: #3f3f46;
+
+  --muted: #f1f0f5;
+  --muted-foreground: #71717a;
+
+  --accent: #ede9fe;
+  --accent-foreground: #6d28d9;
+
+  --destructive: #e11d48;
+  --destructive-foreground: #ffffff;
+  --success: #059669;
+  --warning: #d97706;
+
+  --border: rgba(24, 24, 27, 0.1);
+  --border-strong: rgba(24, 24, 27, 0.2);
+  --input: rgba(24, 24, 27, 0.14);
+  --ring: #7c3aed;
+
+  --cyan: #0891b2;
+  --amber: #d97706;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+    direction: rtl;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: rgba(139, 92, 246, 0.35);
+    color: #ffffff;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  input::-webkit-outer-spin-button,
+  input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+
+  select option,
+  select optgroup {
+    background: var(--card-solid);
+    color: var(--foreground);
+  }
+
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.6);
+    cursor: pointer;
+  }
+
+  .light input[type="date"]::-webkit-calendar-picker-indicator,
+  .light input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: none;
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: var(--card);
+    backdrop-filter: blur(20px) saturate(1.4);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    border: 1px solid var(--border);
+  }
+
+  .glass-strong {
+    background: rgba(255, 255, 255, 0.07);
+    backdrop-filter: blur(28px) saturate(1.6);
+    -webkit-backdrop-filter: blur(28px) saturate(1.6);
+    border: 1px solid var(--border-strong);
+  }
+
+  .light .glass-strong {
+    background: rgba(255, 255, 255, 0.75);
+  }
+
+  .text-gradient {
+    background: linear-gradient(120deg, #c4b5fd 0%, #8b5cf6 45%, #22d3ee 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .light .text-gradient {
+    background: linear-gradient(120deg, #6d28d9 0%, #7c3aed 45%, #0891b2 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+
+  .glow-primary {
+    box-shadow: 0 0 24px var(--primary-glow);
+  }
+
+  .bg-grid {
+    background-image:
+      linear-gradient(to left, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%);
+  }
+
+  .light .bg-grid {
+    background-image:
+      linear-gradient(to left, rgba(24, 24, 27, 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(24, 24, 27, 0.05) 1px, transparent 1px);
+  }
+
+  .scrollbar-slim {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+  }
+
+  .light .scrollbar-slim {
+    scrollbar-color: rgba(24, 24, 27, 0.2) transparent;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 9999px;
+  }
+
+  .light .scrollbar-slim::-webkit-scrollbar-thumb {
+    background: rgba(24, 24, 27, 0.2);
+  }
+
+  .scrollbar-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+}

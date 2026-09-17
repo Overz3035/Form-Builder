@@ -1,0 +1,128 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+###############################################################################
+# Dependencies
+###############################################################################
+node_modules/
+.pnp
+.pnp.*
+.pnpm-store/
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+bun.lockb
+
+###############################################################################
+# Next.js
+###############################################################################
+.next/
+out/
+dist/
+build/
+.next/cache/
+/swc/
+.next/dev/
+
+# Vercel / deployment
+.vercel
+.now
+
+# Turbo
+.turbo
+
+###############################################################################
+# Environment files — NEVER commit secrets (DB + SMS.ir API keys live here)
+###############################################################################
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+!.env.example
+
+###############################################################################
+# TypeScript / ESLint / build artifacts
+###############################################################################
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+next-env.d.ts
+.eslintcache
+.stylelintcache
+*.tgz
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+###############################################################################
+# Testing / coverage
+###############################################################################
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+*.snap
+
+###############################################################################
+# Generated exports (PHP files / uploads created at runtime or via download)
+###############################################################################
+php-exports/
+uploads/
+public/uploads/
+*.sample.php
+
+###############################################################################
+# Local runtime data (app settings with DB + SMS secrets — NEVER commit)
+###############################################################################
+/data/
+
+###############################################################################
+# IDE / editors
+###############################################################################
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/tasks.json
+!.vscode/launch.json
+.idea/
+*.iml
+*.iws
+*.ipr
+.project
+.classpath
+.settings/
+*.swp
+*.swo
+*~
+.subalime-*
+*.code-workspace
+
+###############################################################################
+# OS
+###############################################################################
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+###############################################################################
+# Misc
+###############################################################################
+*.pem
+*.key
+*.cert
+*.pid
+*.seed
+*.orig
+*.rej
+.tmp/
+temp/
